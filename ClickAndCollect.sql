@@ -12,15 +12,51 @@ CREATE TABLE Customers (
 );
 
 
+CREATE TABLE Zone (
+    ZoneID CHAR(1) NOT NULL PRIMARY KEY,
+    Capacity INT NOT NULL,
+    CurrentUtilization INT NOT NULL,
+    ZoneType VARCHAR(20) NOT NULL
+);
+
+
+INSERT INTO Zone (ZoneID, Capacity, CurrentUtilization, ZoneType) VALUES
+('A', 100, 50, 'Standard'),
+('B', 200, 120, 'Standard'),
+('C', 150, 90, 'Refrigerated');
+
+
 CREATE TABLE Orders (
     OrderID INT NOT NULL PRIMARY KEY,
     CustomerID INT NOT NULL,
     OrderTimestamp DATETIME NOT NULL,
     OrderStatus VARCHAR(25) NOT NULL,
-    TotalAmount INT NOT NULL,
+    TotalAmount DECIMAL(10, 2) NOT NULL,
     PriorityLevel VARCHAR(20) NOT NULL,
-    FOREIGN KEY (CustomerID) REFERENCES Customers(CustomerID)
+    ZoneID CHAR(1) NULL,
+    FOREIGN KEY (CustomerID) REFERENCES Customers(CustomerID),
+    FOREIGN KEY (ZoneID) REFERENCES Zone(ZoneID)
 );
+
+-- Create the trigger to assign ZoneID before insert
+DELIMITER $$
+
+CREATE TRIGGER AssignZone
+BEFORE INSERT ON Orders
+FOR EACH ROW
+BEGIN
+    -- Assign ZoneID based on PriorityLevel
+    IF NEW.PriorityLevel = 'High' THEN
+        SET NEW.ZoneID = 'A';
+    ELSEIF NEW.PriorityLevel = 'Medium' THEN
+        SET NEW.ZoneID = 'B';
+    ELSE
+        SET NEW.ZoneID = 'C';
+    END IF;
+END $$
+
+DELIMITER ;
+
 
 CREATE TABLE Items (
     ItemID INT NOT NULL PRIMARY KEY,
@@ -41,12 +77,6 @@ CREATE TABLE OrderItems (
     FOREIGN KEY (ItemID) REFERENCES Items(ItemID)
 );
 
-CREATE TABLE Zone (
-    ZoneID CHAR(1) NOT NULL PRIMARY KEY,
-    Capacity INT NOT NULL,
-    CurrentUtilization INT NOT NULL,
-    ZoneType VARCHAR(20) NOT NULL
-);
 
 CREATE TABLE Appointments (
     AppointmentID INT NOT NULL PRIMARY KEY,
@@ -149,23 +179,6 @@ INSERT INTO OrderItems (OrderItemID, OrderID, ItemID, Quantity, TotalPrice) VALU
 (315, 115, 215, 5, 100),
 (316, 116, 216, 3, 30);
 
-INSERT INTO Zone (ZoneID, Capacity, CurrentUtilization, ZoneType) VALUES
-('A', 100, 50, 'Standard'),
-('B', 200, 120, 'Standard'),
-('C', 150, 90, 'Refrigerated'),
-('D', 100, 70, 'Standard'),
-('E', 300, 200, 'Refrigerated'),
-('F', 250, 150, 'Standard'),
-('G', 180, 100, 'Refrigerated'),
-('H', 220, 110, 'Standard'),
-('I', 160, 60, 'Refrigerated'),
-('J', 140, 100, 'Standard'),
-('K', 120, 90, 'Refrigerated'),
-('L', 200, 150, 'Standard'),
-('M', 300, 210, 'Refrigerated'),
-('N', 180, 120, 'Standard'),
-('O', 220, 180, 'Refrigerated'),
-('P', 250, 200, 'Standard');
 
 INSERT INTO Appointments (AppointmentID, OrderID, CustomerID, AppointmentTime, Status) VALUES
 (401, 101, 918393, '2024-12-23 10:00:00', 'Scheduled'),
@@ -190,18 +203,18 @@ INSERT INTO Staff (StaffID, Name, Role, ZoneID) VALUES
 (503, 'John Miller', 'Coordinator', 'B'),
 (504, 'Sarah Johnson', 'Picker', 'C'),
 (505, 'David Smith', 'Coordinator', 'A'),
-(506, 'Emily Davis', 'Picker', 'D'),
-(507, 'Michael Brown', 'Coordinator', 'B'),
-(508, 'Laura Wilson', 'Picker', 'C'),
-(509, 'Kevin Moore', 'Coordinator', 'E'),
-(510, 'Megan Anderson', 'Picker', 'F'),
-(511, 'Chris Taylor', 'Coordinator', 'G'),
-(512, 'Jessica Martinez', 'Picker', 'H'),
-(513, 'Daniel Thompson', 'Coordinator', 'I'),
-(514, 'Rachel Walker', 'Picker', 'J'),
-(515, 'Steven Clark', 'Coordinator', 'K'),
-(516, 'Andrew Young', 'Picker', 'L'),
-(517, 'Laura Lee', 'Coordinator', 'M');
+(506, 'Emily Davis', 'Picker', 'B'),
+(507, 'Michael Brown', 'Coordinator', 'C'),
+(508, 'Laura Wilson', 'Picker', 'A'),
+(509, 'Kevin Moore', 'Coordinator', 'B'),
+(510, 'Megan Anderson', 'Picker', 'C'),
+(511, 'Chris Taylor', 'Coordinator', 'A'),
+(512, 'Jessica Martinez', 'Picker', 'B'),
+(513, 'Daniel Thompson', 'Coordinator', 'C'),
+(514, 'Rachel Walker', 'Picker', 'A'),
+(515, 'Steven Clark', 'Coordinator', 'B'),
+(516, 'Andrew Young', 'Picker', 'A'),
+(517, 'Laura Lee', 'Coordinator', 'C');
 
 INSERT INTO Notifications (NotificationID, OrderID, CustomerID, NotificationType, SentTimestamp) VALUES
 (601, 101, 918393, 'Order Ready', '2024-12-22 17:00:00'),
@@ -220,3 +233,4 @@ INSERT INTO Notifications (NotificationID, OrderID, CustomerID, NotificationType
 (614, 114, 918406, 'Order Ready', '2025-01-05 17:00:00'),
 (615, 115, 918407, 'Appointment Reminder', '2025-01-06 09:30:00'),
 (616, 116, 918408, 'Pickup Confirmation', '2025-01-07 11:00:00');
+
