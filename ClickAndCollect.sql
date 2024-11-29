@@ -1,9 +1,13 @@
-drop database if exists ClickAndCollect;
-create database ClickAndCollect;
-use ClickAndCollect;
+-- Optimize database structure to efficiently handle click-and-collect orders
 
+-- Database creation
+DROP DATABASE IF EXISTS ClickAndCollect;
+CREATE DATABASE ClickAndCollect;
+USE ClickAndCollect;
+
+-- Customers table
 CREATE TABLE Customers (
-    CustomerID INT NOT NULL PRIMARY KEY,
+    CustomerID INT PRIMARY KEY,
     Name VARCHAR(50) NOT NULL,
     Email VARCHAR(255) NOT NULL,
     PhoneNumber VARCHAR(15) NOT NULL,
@@ -11,75 +15,91 @@ CREATE TABLE Customers (
     LoyaltyPoints INT NOT NULL
 );
 
-
+-- Zone table
 CREATE TABLE Zone (
-    ZoneID CHAR(1) NOT NULL PRIMARY KEY,
+    ZoneID CHAR(1) PRIMARY KEY,
     Capacity INT NOT NULL,
     CurrentUtilization INT NOT NULL,
     ZoneType VARCHAR(20) NOT NULL
 );
 
-
+-- Insert initial zone values
 INSERT INTO Zone (ZoneID, Capacity, CurrentUtilization, ZoneType) VALUES
-('A', 100, 50, 'Standard'),
-('B', 200, 120, 'Standard'),
-('C', 150, 90, 'Refrigerated');
+('A', 100, 50, 'Priority'),
+('B', 200, 120, 'Medium'),
+('C', 150, 90, 'Low');
 
-
+-- Orders table
 CREATE TABLE Orders (
-    OrderID INT NOT NULL PRIMARY KEY,
+    OrderID INT PRIMARY KEY,
     CustomerID INT NOT NULL,
     OrderTimestamp DATETIME NOT NULL,
     OrderStatus VARCHAR(25) NOT NULL,
     TotalAmount DECIMAL(10, 2) NOT NULL,
     PriorityLevel VARCHAR(20) NOT NULL,
-    ZoneID CHAR(1) NULL,
+    ZoneID CHAR(1),
     FOREIGN KEY (CustomerID) REFERENCES Customers(CustomerID),
     FOREIGN KEY (ZoneID) REFERENCES Zone(ZoneID)
 );
 
--- Create the trigger to assign ZoneID before insert
+-- Trigger to assign ZoneID before insert based on priority level
 DELIMITER $$
-
 CREATE TRIGGER AssignZone
 BEFORE INSERT ON Orders
 FOR EACH ROW
 BEGIN
-    -- Assign ZoneID based on PriorityLevel
+    DECLARE assignedZone CHAR(1);
+    
+    -- Allocate ZoneID based on PriorityLevel and current utilization
     IF NEW.PriorityLevel = 'High' THEN
-        SET NEW.ZoneID = 'A';
+        SELECT ZoneID INTO assignedZone FROM Zone
+        WHERE ZoneType = 'Priority' AND Capacity > CurrentUtilization
+        ORDER BY Capacity - CurrentUtilization DESC
+        LIMIT 1;
     ELSEIF NEW.PriorityLevel = 'Medium' THEN
-        SET NEW.ZoneID = 'B';
-    ELSE
-        SET NEW.ZoneID = 'C';
+        SELECT ZoneID INTO assignedZone FROM Zone
+        WHERE ZoneType = 'Medium' AND Capacity > CurrentUtilization
+        ORDER BY Capacity - CurrentUtilization DESC
+        LIMIT 1;
+    ELSEIF NEW.PriorityLevel = 'Low' THEN
+        SELECT ZoneID INTO assignedZone FROM Zone
+        WHERE ZoneType = 'Low' AND Capacity > CurrentUtilization
+        ORDER BY Capacity - CurrentUtilization DESC
+        LIMIT 1;
     END IF;
-END $$
+    
+    SET NEW.ZoneID = assignedZone;
 
+    -- Update Zone utilization
+    UPDATE Zone SET CurrentUtilization = CurrentUtilization + 1
+    WHERE ZoneID = NEW.ZoneID;
+END $$
 DELIMITER ;
 
-
+-- Items table
 CREATE TABLE Items (
-    ItemID INT NOT NULL PRIMARY KEY,
+    ItemID INT PRIMARY KEY,
     Name VARCHAR(100) NOT NULL,
     Category VARCHAR(50) NOT NULL,
-    Price INT NOT NULL,
+    Price DECIMAL(10, 2) NOT NULL,
     StockLevel INT NOT NULL,
     LocationInWarehouse VARCHAR(50) NOT NULL
 );
 
+-- OrderItems table
 CREATE TABLE OrderItems (
-    OrderItemID INT NOT NULL PRIMARY KEY,
+    OrderItemID INT PRIMARY KEY,
     OrderID INT NOT NULL,
     ItemID INT NOT NULL,
     Quantity INT NOT NULL,
-    TotalPrice INT NOT NULL,
+    TotalPrice DECIMAL(10, 2) NOT NULL,
     FOREIGN KEY (OrderID) REFERENCES Orders(OrderID),
     FOREIGN KEY (ItemID) REFERENCES Items(ItemID)
 );
 
-
+-- Appointments table
 CREATE TABLE Appointments (
-    AppointmentID INT NOT NULL PRIMARY KEY,
+    AppointmentID INT PRIMARY KEY,
     OrderID INT NOT NULL,
     CustomerID INT NOT NULL,
     AppointmentTime DATETIME NOT NULL,
@@ -88,17 +108,18 @@ CREATE TABLE Appointments (
     FOREIGN KEY (CustomerID) REFERENCES Customers(CustomerID)
 );
 
+-- Staff table
 CREATE TABLE Staff (
-    StaffID INT NOT NULL PRIMARY KEY,
+    StaffID INT PRIMARY KEY,
     Name VARCHAR(100) NOT NULL,
     Role VARCHAR(50) NOT NULL,
     ZoneID CHAR(1) NOT NULL,
     FOREIGN KEY (ZoneID) REFERENCES Zone(ZoneID)
 );
 
-
+-- Notifications table
 CREATE TABLE Notifications (
-    NotificationID INT NOT NULL PRIMARY KEY,
+    NotificationID INT PRIMARY KEY,
     OrderID INT NOT NULL,
     CustomerID INT NOT NULL,
     NotificationType VARCHAR(50) NOT NULL,
@@ -107,6 +128,7 @@ CREATE TABLE Notifications (
     FOREIGN KEY (CustomerID) REFERENCES Customers(CustomerID)
 );
 
+-- Insert data for Customers
 INSERT INTO Customers (CustomerID, Name, Email, PhoneNumber, PreferredPickupTimestamp, LoyaltyPoints) VALUES
 (918393, 'Alice Johnson', 'alice.johnson@example.com', '123-456-7890', '2024-12-23 10:00:00', 100),
 (918394, 'John Smith', 'john.smith@example.com', '123-555-1234', '2024-12-23 11:00:00', 120),
@@ -125,6 +147,7 @@ INSERT INTO Customers (CustomerID, Name, Email, PhoneNumber, PreferredPickupTime
 (918407, 'Rachel Walker', 'rachel.walker@example.com', '456-789-1234', '2025-01-06 09:15:00', 100),
 (918408, 'Andrew Young', 'andrew.young@example.com', '789-321-4567', '2025-01-07 10:30:00', 90);
 
+-- Insert data for Orders
 INSERT INTO Orders (OrderID, CustomerID, OrderTimestamp, OrderStatus, TotalAmount, PriorityLevel) VALUES
 (101, 918393, '2024-12-22 15:00:00', 'Preparing', 120.50, 'High'),
 (102, 918394, '2024-12-23 16:00:00', 'Preparing', 89.99, 'Medium'),
@@ -143,6 +166,7 @@ INSERT INTO Orders (OrderID, CustomerID, OrderTimestamp, OrderStatus, TotalAmoun
 (115, 918407, '2025-01-06 09:00:00', 'Ready for Pickup', 160.25, 'High'),
 (116, 918408, '2025-01-07 10:45:00', 'Completed', 190.10, 'Low');
 
+-- Insert data for Items
 INSERT INTO Items (ItemID, Name, Category, Price, StockLevel, LocationInWarehouse) VALUES
 (201, 'Bluetooth Headphones', 'Electronics', 35, 49, 'Zone A - Rack 1'),
 (202, 'Wireless Mouse', 'Electronics', 20, 35, 'Zone A - Rack 2'),
@@ -161,6 +185,7 @@ INSERT INTO Items (ItemID, Name, Category, Price, StockLevel, LocationInWarehous
 (215, 'Tablet Cover', 'Accessories', 20, 90, 'Zone B - Shelf 6'),
 (216, 'HDMI Cable', 'Electronics', 10, 100, 'Zone C - Bin 9');
 
+-- Insert data for OrderItems
 INSERT INTO OrderItems (OrderItemID, OrderID, ItemID, Quantity, TotalPrice) VALUES
 (301, 101, 201, 1, 35),
 (302, 102, 202, 2, 40),
@@ -179,7 +204,7 @@ INSERT INTO OrderItems (OrderItemID, OrderID, ItemID, Quantity, TotalPrice) VALU
 (315, 115, 215, 5, 100),
 (316, 116, 216, 3, 30);
 
-
+-- Insert data for Appointments
 INSERT INTO Appointments (AppointmentID, OrderID, CustomerID, AppointmentTime, Status) VALUES
 (401, 101, 918393, '2024-12-23 10:00:00', 'Scheduled'),
 (402, 102, 918394, '2024-12-23 11:00:00', 'Scheduled'),
@@ -198,6 +223,8 @@ INSERT INTO Appointments (AppointmentID, OrderID, CustomerID, AppointmentTime, S
 (415, 115, 918407, '2025-01-06 09:15:00', 'Completed'),
 (416, 116, 918408, '2025-01-07 10:30:00', 'Scheduled');
 
+
+-- Insert data for Staff
 INSERT INTO Staff (StaffID, Name, Role, ZoneID) VALUES
 (502, 'Emma White', 'Picker', 'A'),
 (503, 'John Miller', 'Coordinator', 'B'),
@@ -216,6 +243,7 @@ INSERT INTO Staff (StaffID, Name, Role, ZoneID) VALUES
 (516, 'Andrew Young', 'Picker', 'A'),
 (517, 'Laura Lee', 'Coordinator', 'C');
 
+-- Insert data for Notifications
 INSERT INTO Notifications (NotificationID, OrderID, CustomerID, NotificationType, SentTimestamp) VALUES
 (601, 101, 918393, 'Order Ready', '2024-12-22 17:00:00'),
 (602, 102, 918394, 'Order Ready', '2024-12-23 16:00:00'),
