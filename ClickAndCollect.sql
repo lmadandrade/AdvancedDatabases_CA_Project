@@ -128,6 +128,20 @@ CREATE TABLE Notifications (
     FOREIGN KEY (CustomerID) REFERENCES Customers(CustomerID)
 );
 
+-- Create Trigger to decrement Zone utilization after order is completed
+DELIMITER $$
+CREATE TRIGGER DecrementZoneUtilization
+AFTER UPDATE ON Orders
+FOR EACH ROW
+BEGIN
+    IF NEW.OrderStatus = 'Completed' AND OLD.OrderStatus != 'Completed' THEN
+        UPDATE Zone
+        SET CurrentUtilization = CurrentUtilization - 1
+        WHERE ZoneID = NEW.ZoneID;
+    END IF;
+END $$
+DELIMITER ;
+
 -- Insert data for Customers
 INSERT INTO Customers (CustomerID, Name, Email, PhoneNumber, PreferredPickupTimestamp, LoyaltyPoints) VALUES
 (918393, 'Alice Johnson', 'alice.johnson@example.com', '123-456-7890', '2024-12-23 10:00:00', 100),
@@ -261,4 +275,10 @@ INSERT INTO Notifications (NotificationID, OrderID, CustomerID, NotificationType
 (614, 114, 918406, 'Order Ready', '2025-01-05 17:00:00'),
 (615, 115, 918407, 'Appointment Reminder', '2025-01-06 09:30:00'),
 (616, 116, 918408, 'Pickup Confirmation', '2025-01-07 11:00:00');
+
+-- Example Query 1: Retrieve all high-priority orders and their allocated storage zones to demonstrate the automated zone allocation.
+SELECT o.OrderID, o.CustomerID, o.OrderTimestamp, o.OrderStatus, o.TotalAmount, o.PriorityLevel, z.ZoneID, z.ZoneType
+FROM Orders o
+JOIN Zone z ON o.ZoneID = z.ZoneID
+WHERE o.PriorityLevel = 'High';
 
