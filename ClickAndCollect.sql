@@ -97,13 +97,12 @@ CREATE TABLE OrderItems (
     FOREIGN KEY (ItemID) REFERENCES Items(ItemID)
 );
 
--- Appointments table
 CREATE TABLE Appointments (
-    AppointmentID INT PRIMARY KEY,
+    AppointmentID INT PRIMARY KEY AUTO_INCREMENT,
     OrderID INT NOT NULL,
     CustomerID INT NOT NULL,
     AppointmentTime DATETIME NOT NULL,
-    Status VARCHAR(20) NOT NULL,
+    Status VARCHAR(20) NOT NULL CHECK (Status IN ('Scheduled', 'Completed', 'Canceled')),
     FOREIGN KEY (OrderID) REFERENCES Orders(OrderID),
     FOREIGN KEY (CustomerID) REFERENCES Customers(CustomerID)
 );
@@ -128,6 +127,34 @@ CREATE TABLE Notifications (
     FOREIGN KEY (CustomerID) REFERENCES Customers(CustomerID)
 );
 
+CREATE TABLE TimeSlots (
+    SlotID INT PRIMARY KEY AUTO_INCREMENT,
+    SlotStartTime TIME NOT NULL,
+    SlotEndTime TIME NOT NULL,
+    SlotCapacity INT NOT NULL,
+    SlotBooked INT DEFAULT 0
+);
+
+-- Insert initial time slots
+INSERT INTO TimeSlots (SlotStartTime, SlotEndTime, SlotCapacity) VALUES
+('08:00:00', '09:00:00', 10),
+('09:00:00', '10:00:00', 15),
+('10:00:00', '11:00:00', 20),
+('11:00:00', '12:00:00', 20),
+('13:00:00', '14:00:00', 15),
+('14:00:00', '15:00:00', 10);
+
+CREATE TABLE AppointmentAssignments (
+    AssignmentID INT PRIMARY KEY AUTO_INCREMENT,
+    AppointmentID INT NOT NULL,
+    SlotID INT NOT NULL,
+    StaffID INT NOT NULL,
+    FOREIGN KEY (AppointmentID) REFERENCES Appointments(AppointmentID),
+    FOREIGN KEY (SlotID) REFERENCES TimeSlots(SlotID),
+    FOREIGN KEY (StaffID) REFERENCES Staff(StaffID)
+);
+
+
 -- Create Trigger to decrement Zone utilization after order is completed
 DELIMITER $$
 CREATE TRIGGER DecrementZoneUtilization
@@ -141,6 +168,48 @@ BEGIN
     END IF;
 END $$
 DELIMITER ;
+
+
+DELIMITER $$
+CREATE TRIGGER CheckSlotCapacity
+BEFORE INSERT ON AppointmentAssignments
+FOR EACH ROW
+BEGIN
+    DECLARE slotRemaining INT;
+
+    -- Check available capacity for the time slot
+    SELECT SlotCapacity - SlotBooked INTO slotRemaining 
+    FROM TimeSlots WHERE SlotID = NEW.SlotID;
+
+    IF slotRemaining <= 0 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'This time slot is fully booked. Please select a different slot.';
+    END IF;
+
+    -- Increment the booked count for the time slot
+    UPDATE TimeSlots
+    SET SlotBooked = SlotBooked + 1
+    WHERE SlotID = NEW.SlotID;
+END $$
+DELIMITER ;
+
+DELIMITER $$
+CREATE TRIGGER ReleaseSlotCapacity
+AFTER DELETE ON AppointmentAssignments
+FOR EACH ROW
+BEGIN
+    UPDATE TimeSlots
+    SET SlotBooked = SlotBooked - 1
+    WHERE SlotID = OLD.SlotID;
+END $$
+DELIMITER ;
+
+CREATE INDEX idx_orders_zoneid ON Orders (ZoneID);
+CREATE INDEX idx_staff_zoneid ON Staff (ZoneID);
+CREATE INDEX idx_appointments_customerid ON Appointments (CustomerID);
+CREATE INDEX idx_orders_customerid ON Orders (CustomerID);
+CREATE INDEX idx_notifications_customerid ON Notifications (CustomerID);
+
 
 -- Insert data for Customers
 INSERT INTO Customers (CustomerID, Name, Email, PhoneNumber, PreferredPickupTimestamp, LoyaltyPoints) VALUES
@@ -276,9 +345,51 @@ INSERT INTO Notifications (NotificationID, OrderID, CustomerID, NotificationType
 (615, 115, 918407, 'Appointment Reminder', '2025-01-06 09:30:00'),
 (616, 116, 918408, 'Pickup Confirmation', '2025-01-07 11:00:00');
 
+INSERT INTO AppointmentAssignments (AssignmentID, AppointmentID, SlotID, StaffID) VALUES
+(1, 401, 1, 502),  -- Alice Johnson, assigned to Emma White
+(2, 402, 2, 503),  -- John Smith, assigned to John Miller
+(3, 403, 3, 504),  -- Jane Doe, assigned to Sarah Johnson
+(4, 404, 4, 505),  -- Michael Brown, assigned to David Smith
+(5, 405, 5, 506),  -- Sarah Johnson, assigned to Emily Davis
+(6, 406, 6, 507),  -- David Wilson, assigned to Michael Brown
+(7, 408, 1, 508),  -- Chris Taylor, assigned to Laura Wilson
+(8, 410, 3, 510),  -- Kevin Moore, assigned to Megan Anderson
+(9, 412, 4, 511),  -- Daniel Thompson, assigned to Chris Taylor
+(10, 414, 6, 512); -- Steven Clark, assigned to Jessica Martinez
+
+
 -- Example Query 1: Retrieve all high-priority orders and their allocated storage zones to demonstrate the automated zone allocation.
 SELECT o.OrderID, o.CustomerID, o.OrderTimestamp, o.OrderStatus, o.TotalAmount, o.PriorityLevel, z.ZoneID, z.ZoneType
 FROM Orders o
 JOIN Zone z ON o.ZoneID = z.ZoneID
 WHERE o.PriorityLevel = 'High';
 
+-- Example Query 2: This query retrieves a detailed overview of customer pickup appointments for a specific date, including customer details, assigned time slots with remaining capacity, staff assigned to manage the appointments, and any notifications sent to the customers, ensuring efficient coordination of time slots, staff, and customer communication.
+SELECT 
+    c.Name AS CustomerName,
+    c.Email AS CustomerEmail,
+    a.AppointmentTime,
+    ts.SlotStartTime,
+    ts.SlotEndTime,
+    ts.SlotCapacity - ts.SlotBooked AS AvailableCapacity,
+    s.Name AS StaffAssigned,
+    n.NotificationType,
+    n.SentTimestamp AS NotificationSentTime
+FROM 
+    Appointments a
+JOIN 
+    Customers c ON a.CustomerID = c.CustomerID
+JOIN 
+    AppointmentAssignments aa ON a.AppointmentID = aa.AppointmentID
+JOIN 
+    TimeSlots ts ON aa.SlotID = ts.SlotID
+JOIN 
+    Staff s ON aa.StaffID = s.StaffID
+LEFT JOIN 
+    Notifications n ON a.OrderID = n.OrderID  -- Fixed join condition
+WHERE 
+    DATE(a.AppointmentTime) = '2024-12-23'  -- Filter for a specific date
+    AND a.Status = 'Scheduled'             -- Only include scheduled appointments
+ORDER BY 
+    ts.SlotStartTime,                      -- Order by time slots for clarity
+    c.Name;                                -- Order by customer name within slots
