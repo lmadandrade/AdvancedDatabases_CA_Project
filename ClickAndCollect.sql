@@ -99,8 +99,7 @@ CREATE TABLE Appointments (
     AppointmentTime DATETIME NOT NULL,
     Status VARCHAR(20) NOT NULL CHECK (Status IN ('Scheduled', 'Completed', 'Canceled')),
     FOREIGN KEY (OrderID) REFERENCES Orders(OrderID),
-    FOREIGN KEY (CustomerID) REFERENCES Customers(CustomerID)
-);
+    FOREIGN KEY (CustomerID) REFERENCES Customers(CustomerID));
 
 -- Staff table
 CREATE TABLE Staff (
@@ -108,8 +107,7 @@ CREATE TABLE Staff (
     Name VARCHAR(100) NOT NULL,
     Role VARCHAR(50) NOT NULL,
     ZoneID CHAR(1) NOT NULL,
-    FOREIGN KEY (ZoneID) REFERENCES Zone(ZoneID)
-);
+    FOREIGN KEY (ZoneID) REFERENCES Zone(ZoneID));
 
 -- Notifications table
 CREATE TABLE Notifications (
@@ -119,18 +117,16 @@ CREATE TABLE Notifications (
     NotificationType VARCHAR(50) NOT NULL,
     SentTimestamp DATETIME NOT NULL,
     FOREIGN KEY (OrderID) REFERENCES Orders(OrderID),
-    FOREIGN KEY (CustomerID) REFERENCES Customers(CustomerID)
-);
+    FOREIGN KEY (CustomerID) REFERENCES Customers(CustomerID));
 
 CREATE TABLE TimeSlots (
     SlotID INT PRIMARY KEY AUTO_INCREMENT,
     SlotStartTime TIME NOT NULL,
     SlotEndTime TIME NOT NULL,
     SlotCapacity INT NOT NULL,
-    SlotBooked INT DEFAULT 0
-);
+    SlotBooked INT DEFAULT 0);
 
--- Insert initial time slots
+-- Insert time slots
 INSERT INTO TimeSlots (SlotStartTime, SlotEndTime, SlotCapacity) VALUES
 ('08:00:00', '09:00:00', 10),
 ('09:00:00', '10:00:00', 15),
@@ -146,11 +142,10 @@ CREATE TABLE AppointmentAssignments (
     StaffID INT NOT NULL,
     FOREIGN KEY (AppointmentID) REFERENCES Appointments(AppointmentID),
     FOREIGN KEY (SlotID) REFERENCES TimeSlots(SlotID),
-    FOREIGN KEY (StaffID) REFERENCES Staff(StaffID)
-);
+    FOREIGN KEY (StaffID) REFERENCES Staff(StaffID));
 
 
--- Create Trigger to decrement Zone utilization after order is completed
+-- Create a Trigger to decrement Zone utilization after the order is completed
 DELIMITER $$
 CREATE TRIGGER DecrementZoneUtilization
 AFTER UPDATE ON Orders
