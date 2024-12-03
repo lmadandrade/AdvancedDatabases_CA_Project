@@ -354,32 +354,11 @@ FROM Orders o
 JOIN Zone z ON o.ZoneID = z.ZoneID
 WHERE o.PriorityLevel = 'High';
 
--- Example Query 2: This query retrieves a detailed overview of customer pickup appointments for a specific date, including customer details, assigned time slots with remaining capacity, staff assigned to manage the appointments, and any notifications sent to the customers, ensuring efficient coordination of time slots, staff, and customer communication.
-SELECT 
-    c.Name AS CustomerName,
-    c.Email AS CustomerEmail,
-    a.AppointmentTime,
-    ts.SlotStartTime,
-    ts.SlotEndTime,
-    ts.SlotCapacity - ts.SlotBooked AS AvailableCapacity,
-    s.Name AS StaffAssigned,
-    n.NotificationType,
-    n.SentTimestamp AS NotificationSentTime
-FROM 
-    Appointments a
-JOIN 
-    Customers c ON a.CustomerID = c.CustomerID
-JOIN 
-    AppointmentAssignments aa ON a.AppointmentID = aa.AppointmentID
-JOIN 
-    TimeSlots ts ON aa.SlotID = ts.SlotID
-JOIN 
-    Staff s ON aa.StaffID = s.StaffID
-LEFT JOIN 
-    Notifications n ON a.OrderID = n.OrderID  -- Fixed join condition
-WHERE 
-    DATE(a.AppointmentTime) = '2024-12-23'  -- Filter for a specific date
-    AND a.Status = 'Scheduled'             -- Only include scheduled appointments
-ORDER BY 
-    ts.SlotStartTime,                      -- Order by time slots for clarity
-    c.Name;                                -- Order by customer name within slots
+-- Example Query 2: Query to List Customers with Scheduled Appointments in Specific Time Slots, This demonstrates time slot and appointment management.
+SELECT c.Name AS CustomerName, a.AppointmentTime, ts.SlotStartTime, ts.SlotEndTime, s.Name AS AssignedStaff
+FROM AppointmentAssignments aa
+JOIN Appointments a ON aa.AppointmentID = a.AppointmentID
+JOIN TimeSlots ts ON aa.SlotID = ts.SlotID
+JOIN Customers c ON a.CustomerID = c.CustomerID
+JOIN Staff s ON aa.StaffID = s.StaffID
+WHERE ts.SlotStartTime >= '09:00:00' AND ts.SlotEndTime <= '12:00:00';
