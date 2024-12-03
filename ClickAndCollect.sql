@@ -1,6 +1,6 @@
--- Optimize database structure to efficiently handle click-and-collect orders
+-- Click-and-Collect Database
 
--- Database creation
+-- Creation of Database 
 DROP DATABASE IF EXISTS ClickAndCollect;
 CREATE DATABASE ClickAndCollect;
 USE ClickAndCollect;
@@ -12,18 +12,16 @@ CREATE TABLE Customers (
     Email VARCHAR(255) NOT NULL,
     PhoneNumber VARCHAR(15) NOT NULL,
     PreferredPickupTimestamp DATETIME NOT NULL,
-    LoyaltyPoints INT NOT NULL
-);
+    LoyaltyPoints INT NOT NULL);
 
 -- Zone table
 CREATE TABLE Zone (
     ZoneID CHAR(1) PRIMARY KEY,
     Capacity INT NOT NULL,
     CurrentUtilization INT NOT NULL,
-    ZoneType VARCHAR(20) NOT NULL
-);
+    ZoneType VARCHAR(20) NOT NULL);
 
--- Insert initial zone values
+-- Zone values
 INSERT INTO Zone (ZoneID, Capacity, CurrentUtilization, ZoneType) VALUES
 ('A', 100, 50, 'Priority'),
 ('B', 200, 120, 'Medium'),
@@ -39,10 +37,9 @@ CREATE TABLE Orders (
     PriorityLevel VARCHAR(20) NOT NULL,
     ZoneID CHAR(1),
     FOREIGN KEY (CustomerID) REFERENCES Customers(CustomerID),
-    FOREIGN KEY (ZoneID) REFERENCES Zone(ZoneID)
-);
+    FOREIGN KEY (ZoneID) REFERENCES Zone(ZoneID));
 
--- Trigger to assign ZoneID before insert based on priority level
+-- Trigger to assign ZoneID
 DELIMITER $$
 CREATE TRIGGER AssignZone
 BEFORE INSERT ON Orders
@@ -83,8 +80,7 @@ CREATE TABLE Items (
     Category VARCHAR(50) NOT NULL,
     Price DECIMAL(10, 2) NOT NULL,
     StockLevel INT NOT NULL,
-    LocationInWarehouse VARCHAR(50) NOT NULL
-);
+    LocationInWarehouse VARCHAR(50) NOT NULL);
 
 -- OrderItems table
 CREATE TABLE OrderItems (
@@ -94,8 +90,7 @@ CREATE TABLE OrderItems (
     Quantity INT NOT NULL,
     TotalPrice DECIMAL(10, 2) NOT NULL,
     FOREIGN KEY (OrderID) REFERENCES Orders(OrderID),
-    FOREIGN KEY (ItemID) REFERENCES Items(ItemID)
-);
+    FOREIGN KEY (ItemID) REFERENCES Items(ItemID));
 
 CREATE TABLE Appointments (
     AppointmentID INT PRIMARY KEY AUTO_INCREMENT,
