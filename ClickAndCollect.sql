@@ -1,11 +1,14 @@
 -- Click-and-Collect Database
 
--- Creation of Database 
+-- Create or reset the ClickAndCollect database.
+-- This ensures a fresh start by dropping any existing database with the same name.
 DROP DATABASE IF EXISTS ClickAndCollect;
 CREATE DATABASE ClickAndCollect;
 USE ClickAndCollect;
 
 -- Customers table
+-- This table holds details about customers who use the Click-and-Collect service.
+-- It includes personal details and preferences like their preferred pickup times.
 CREATE TABLE Customers (
     CustomerID INT PRIMARY KEY,
     Name VARCHAR(50) NOT NULL,
@@ -15,6 +18,8 @@ CREATE TABLE Customers (
     LoyaltyPoints INT NOT NULL);
 
 -- Zone table
+-- Defines storage or pickup zones within the warehouse or store.
+-- Each zone has specific capacity limits and utilization to organize order handling.
 CREATE TABLE Zone (
     ZoneID CHAR(1) PRIMARY KEY,
     Capacity INT NOT NULL,
@@ -28,6 +33,8 @@ INSERT INTO Zone (ZoneID, Capacity, CurrentUtilization, ZoneType) VALUES
 ('C', 150, 90, 'Low');
 
 -- Orders table
+-- This table stores information about customer orders.
+-- It includes the customer, order status, total amount, and assigned zone.
 CREATE TABLE Orders (
     OrderID INT PRIMARY KEY,
     CustomerID INT NOT NULL,
@@ -40,6 +47,8 @@ CREATE TABLE Orders (
     FOREIGN KEY (ZoneID) REFERENCES Zone(ZoneID));
 
 -- Trigger to assign ZoneID
+-- Automatically assigns a zone to an order based on its priority level.
+-- Updates the zone's utilization to keep track of available space.
 DELIMITER $$
 CREATE TRIGGER AssignZone
 BEFORE INSERT ON Orders
@@ -74,6 +83,8 @@ END $$
 DELIMITER ;
 
 -- Items table
+-- Stores information about items available for purchase.
+-- Tracks stock levels and warehouse locations for efficient inventory management.
 CREATE TABLE Items (
     ItemID INT PRIMARY KEY,
     Name VARCHAR(100) NOT NULL,
@@ -83,6 +94,8 @@ CREATE TABLE Items (
     LocationInWarehouse VARCHAR(50) NOT NULL);
 
 -- OrderItems table
+-- Links orders to the items they contain.
+-- Tracks quantities and calculates total prices for each item in an order.
 CREATE TABLE OrderItems (
     OrderItemID INT PRIMARY KEY,
     OrderID INT NOT NULL,
@@ -91,6 +104,10 @@ CREATE TABLE OrderItems (
     TotalPrice DECIMAL(10, 2) NOT NULL,
     FOREIGN KEY (OrderID) REFERENCES Orders(OrderID),
     FOREIGN KEY (ItemID) REFERENCES Items(ItemID));
+
+-- Appointments table
+-- Manages scheduled pickup appointments for customers.
+-- Tracks the status of the appointment and links it to customers and orders.
 
 CREATE TABLE Appointments (
     AppointmentID INT PRIMARY KEY AUTO_INCREMENT,
@@ -102,6 +119,9 @@ CREATE TABLE Appointments (
     FOREIGN KEY (CustomerID) REFERENCES Customers(CustomerID));
 
 -- Staff table
+-- Stores information about staff members responsible for various tasks.
+-- Includes their roles and assigned zones for streamlined operations.
+
 CREATE TABLE Staff (
     StaffID INT PRIMARY KEY,
     Name VARCHAR(100) NOT NULL,
@@ -110,6 +130,9 @@ CREATE TABLE Staff (
     FOREIGN KEY (ZoneID) REFERENCES Zone(ZoneID));
 
 -- Notifications table
+-- Tracks notifications sent to customers regarding their orders and appointments.
+-- Helps maintain communication about updates and reminders.
+
 CREATE TABLE Notifications (
     NotificationID INT PRIMARY KEY,
     OrderID INT NOT NULL,
@@ -119,6 +142,9 @@ CREATE TABLE Notifications (
     FOREIGN KEY (OrderID) REFERENCES Orders(OrderID),
     FOREIGN KEY (CustomerID) REFERENCES Customers(CustomerID));
 
+-- TimeSlots Table
+-- Manages time slots for scheduling pickup appointments.
+-- Includes capacity and keeps track of booked slots.
 CREATE TABLE TimeSlots (
     SlotID INT PRIMARY KEY AUTO_INCREMENT,
     SlotStartTime TIME NOT NULL,
@@ -126,7 +152,6 @@ CREATE TABLE TimeSlots (
     SlotCapacity INT NOT NULL,
     SlotBooked INT DEFAULT 0);
 
--- Insert time slots
 INSERT INTO TimeSlots (SlotStartTime, SlotEndTime, SlotCapacity) VALUES
 ('08:00:00', '09:00:00', 10),
 ('09:00:00', '10:00:00', 15),
@@ -134,6 +159,10 @@ INSERT INTO TimeSlots (SlotStartTime, SlotEndTime, SlotCapacity) VALUES
 ('11:00:00', '12:00:00', 20),
 ('13:00:00', '14:00:00', 15),
 ('14:00:00', '15:00:00', 10);
+
+-- AppointmentAssignments Table
+-- Links appointments to specific time slots and staff members.
+-- Ensures proper scheduling and allocation of resources.
 
 CREATE TABLE AppointmentAssignments (
     AssignmentID INT PRIMARY KEY AUTO_INCREMENT,
@@ -145,7 +174,9 @@ CREATE TABLE AppointmentAssignments (
     FOREIGN KEY (StaffID) REFERENCES Staff(StaffID));
 
 
--- Create a Trigger to decrement Zone utilization after the order is completed
+-- This trigger automatically decreases the utilization count for a zone when an order's status is marked as 'Completed.'
+-- It ensures accurate tracking of zone capacity after an order is fulfilled.
+
 DELIMITER $$
 CREATE TRIGGER DecrementZoneUtilization
 AFTER UPDATE ON Orders
@@ -159,6 +190,8 @@ BEGIN
 END $$
 DELIMITER ;
 
+-- This trigger prevents overbooking of appointment slots by checking the remaining capacity before booking.
+-- If the slot is already full, it raises an error to inform the user.
 
 DELIMITER $$
 CREATE TRIGGER CheckSlotCapacity
@@ -183,6 +216,10 @@ BEGIN
 END $$
 DELIMITER ;
 
+
+-- This trigger decreases the booked count for a time slot when an appointment assignment is deleted.
+-- It ensures the time slot availability is accurately updated.
+
 DELIMITER $$
 CREATE TRIGGER ReleaseSlotCapacity
 AFTER DELETE ON AppointmentAssignments
@@ -194,14 +231,28 @@ BEGIN
 END $$
 DELIMITER ;
 
+-- Create indexes on frequently queried columns to speed up search and join operations.
+
+
+-- Index to quickly locate orders by their assigned zone.
 CREATE INDEX idx_orders_zoneid ON Orders (ZoneID);
+
+-- Index to quickly locate staff members by their assigned zone.
 CREATE INDEX idx_staff_zoneid ON Staff (ZoneID);
+
+-- Index to quickly find appointments by customer.
 CREATE INDEX idx_appointments_customerid ON Appointments (CustomerID);
+
+-- Index to quickly locate orders by customer.
 CREATE INDEX idx_orders_customerid ON Orders (CustomerID);
+
+-- Index to quickly find notifications for a specific customer.
 CREATE INDEX idx_notifications_customerid ON Notifications (CustomerID);
 
 
--- Insert data for Customers
+-- Populate the Customers table with sample data.
+-- Each entry represents a customer using the Click-and-Collect service.
+
 INSERT INTO Customers (CustomerID, Name, Email, PhoneNumber, PreferredPickupTimestamp, LoyaltyPoints) VALUES
 (918393, 'Alice Johnson', 'alice.johnson@example.com', '123-456-7890', '2024-12-23 10:00:00', 100),
 (918394, 'John Smith', 'john.smith@example.com', '123-555-1234', '2024-12-23 11:00:00', 120),
@@ -220,7 +271,7 @@ INSERT INTO Customers (CustomerID, Name, Email, PhoneNumber, PreferredPickupTime
 (918407, 'Rachel Walker', 'rachel.walker@example.com', '456-789-1234', '2025-01-06 09:15:00', 100),
 (918408, 'Andrew Young', 'andrew.young@example.com', '789-321-4567', '2025-01-07 10:30:00', 90);
 
--- Insert data for Orders
+-- Populate the Orders table with sample data.
 INSERT INTO Orders (OrderID, CustomerID, OrderTimestamp, OrderStatus, TotalAmount, PriorityLevel) VALUES
 (101, 918393, '2024-12-22 15:00:00', 'Preparing', 120.50, 'High'),
 (102, 918394, '2024-12-23 16:00:00', 'Preparing', 89.99, 'Medium'),
@@ -239,7 +290,7 @@ INSERT INTO Orders (OrderID, CustomerID, OrderTimestamp, OrderStatus, TotalAmoun
 (115, 918407, '2025-01-06 09:00:00', 'Ready for Pickup', 160.25, 'High'),
 (116, 918408, '2025-01-07 10:45:00', 'Completed', 190.10, 'Low');
 
--- Insert data for Items
+-- Populate the Items table with sample product data.
 INSERT INTO Items (ItemID, Name, Category, Price, StockLevel, LocationInWarehouse) VALUES
 (201, 'Bluetooth Headphones', 'Electronics', 35, 49, 'Zone A - Rack 1'),
 (202, 'Wireless Mouse', 'Electronics', 20, 35, 'Zone A - Rack 2'),
@@ -348,13 +399,16 @@ INSERT INTO AppointmentAssignments (AssignmentID, AppointmentID, SlotID, StaffID
 (10, 414, 6, 512); -- Steven Clark, assigned to Jessica Martinez
 
 
--- Example Query 1: Retrieve all high-priority orders and their allocated storage zones to demonstrate the automated zone allocation.
-SELECT o.OrderID, o.CustomerID, o.OrderTimestamp, o.OrderStatus, o.TotalAmount, o.PriorityLevel, z.ZoneID, z.ZoneType
+-- This query retrieves all orders marked as 'High' priority and displays their details, including the allocated storage zones. 
+-- It demonstrates the effectiveness of the automated zone allocation system.
+
 FROM Orders o
 JOIN Zone z ON o.ZoneID = z.ZoneID
 WHERE o.PriorityLevel = 'High';
 
--- Example Query 2: Query to List Customers with Scheduled Appointments in Specific Time Slots, This demonstrates time slot and appointment management.
+-- This query lists all customers who have scheduled appointments within specific time slots. It also shows the assigned staff members for each appointment. 
+-- This demonstrates the system's ability to manage time slots and allocate staff efficiently.
+
 SELECT c.Name AS CustomerName, a.AppointmentTime, ts.SlotStartTime, ts.SlotEndTime, s.Name AS AssignedStaff
 FROM AppointmentAssignments aa
 JOIN Appointments a ON aa.AppointmentID = a.AppointmentID
