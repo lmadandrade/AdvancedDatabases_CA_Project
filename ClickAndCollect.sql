@@ -399,12 +399,19 @@ INSERT INTO AppointmentAssignments (AssignmentID, AppointmentID, SlotID, StaffID
 (10, 414, 6, 512); -- Steven Clark, assigned to Jessica Martinez
 
 
--- This query retrieves all orders marked as 'High' priority and displays their details, including the allocated storage zones. 
--- It demonstrates the effectiveness of the automated zone allocation system.
-
-FROM Orders o
-JOIN Zone z ON o.ZoneID = z.ZoneID
-WHERE o.PriorityLevel = 'High';
+-- This query calculates the total number of orders in each zone by priority level and provides insights into space utilization for tracking porpuses.
+-- It demonstrates which zones are most used based on the current capacity and the priority levels of the orders they store
+SELECT 
+    z.ZoneID,
+    z.ZoneType AS ZonePriorityLevel,
+    z.Capacity,
+    z.CurrentUtilization,
+    COUNT(o.OrderID) AS TotalOrders,
+    ROUND((z.CurrentUtilization / z.Capacity) * 100, 2) AS UtilizationPercentage
+FROM Zone z
+LEFT JOIN Orders o ON z.ZoneID = o.ZoneID
+GROUP BY z.ZoneID, z.ZoneType, z.Capacity, z.CurrentUtilization
+ORDER BY UtilizationPercentage DESC;
 
 -- This query lists all customers who have scheduled appointments within specific time slots. It also shows the assigned staff members for each appointment. 
 -- This demonstrates the system's ability to manage time slots and allocate staff efficiently.
